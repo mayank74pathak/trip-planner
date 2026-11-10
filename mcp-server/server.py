@@ -3,7 +3,7 @@ from mcp.server.fastmcp import FastMCP
 
 mcp = FastMCP(
     "Trip Planner MCP Server",
-    host="127.0.0.1",
+    host="0.0.0.0",
     port=8001,
 )
 
