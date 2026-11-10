@@ -8,4 +8,4 @@ pydantic[email]
 python-jose[cryptography]
 pwdlib[argon2]
 openai
-mcp
+mcp==1.30.0
