@@ -23,7 +23,6 @@ async def generate_with_mcp(prompt: str, model: str) -> str:
     async with streamable_http_client(MCP_SERVER_URL) as (
         read_stream,
         write_stream,
-        _,
     ):
         async with ClientSession(read_stream, write_stream) as session:
             await session.initialize()
