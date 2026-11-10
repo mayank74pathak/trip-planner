@@ -20,7 +20,8 @@ app = FastAPI(
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
-        "https://trip-planner-ten-mocha.vercel.app"
+        "https://trip-planner-ten-mocha.vercel.app",
+        "https://trip-planner-geslzdpwo-mayank74pathaks-projects.vercel.app",
     ],
     allow_credentials=True,
     allow_methods=["*"],
