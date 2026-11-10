@@ -29,6 +29,7 @@ async def generate_with_mcp(prompt: str, model: str) -> str:
         async with streamable_http_client(MCP_SERVER_URL) as (
             read_stream,
             write_stream,
+            get_session_id,
         ):
             logger.info("MCP HTTP connection established")
 
