@@ -1,10 +1,13 @@
-
+import os
 from mcp.server.fastmcp import FastMCP
+
+# Read the port assigned by Render
+PORT = int(os.getenv("PORT", "8001"))
 
 mcp = FastMCP(
     "Trip Planner MCP Server",
     host="0.0.0.0",
-    port=8001,
+    port=PORT,
 )
 
 
@@ -18,12 +21,7 @@ def estimate_trip_cost(
     activities_per_person: float,
     budget: float,
 ) -> dict:
-    """Estimate trip expenses and check whether they fit the budget.
-
-    All monetary amounts are in INR.
-    Food is calculated for nights + 1 days.
-    Activities are calculated per traveler for the whole trip.
-    """
+    """Estimate trip expenses and check whether they fit the budget."""
 
     if nights < 1:
         raise ValueError("Nights must be at least 1.")
@@ -63,11 +61,7 @@ def estimate_trip_cost(
 
 @mcp.tool()
 def search_attractions(destination: str) -> dict:
-    """Find sample attractions for a supported destination.
-
-    This initial version uses a local sample dataset,
-    not live internet search.
-    """
+    """Find sample attractions for a supported destination."""
 
     attractions = {
         "goa": [
