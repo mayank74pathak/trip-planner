@@ -1,6 +1,7 @@
 
 import json
 import os
+import logging
 
 from dotenv import load_dotenv
 from mcp import ClientSession
@@ -9,6 +10,8 @@ from openai import AsyncOpenAI
 
 load_dotenv()
 
+logger = logging.getLogger(__name__)
+
 MCP_SERVER_URL = os.getenv(
     "MCP_SERVER_URL",
     "http://127.0.0.1:8001/mcp",
@@ -16,61 +19,87 @@ MCP_SERVER_URL = os.getenv(
 
 
 async def generate_with_mcp(prompt: str, model: str) -> str:
-    """Let OpenAI select and execute tools exposed by the MCP server."""
+    """Generate an itinerary using OpenAI and MCP tools."""
 
     client = AsyncOpenAI()
 
-    async with streamable_http_client(MCP_SERVER_URL) as (
-        read_stream,
-        write_stream,
-    ):
-        async with ClientSession(read_stream, write_stream) as session:
-            await session.initialize()
+    logger.info("Connecting to MCP server: %s", MCP_SERVER_URL)
 
-            # Discover tools from the MCP server.
-            tool_result = await session.list_tools()
+    try:
+        async with streamable_http_client(MCP_SERVER_URL) as (
+            read_stream,
+            write_stream,
+        ):
+            logger.info("MCP HTTP connection established")
 
-            openai_tools = []
+            async with ClientSession(read_stream, write_stream) as session:
 
-            for tool in tool_result.tools:
-                schema = tool.model_dump(by_alias=True)
+                await session.initialize()
+                logger.info("MCP session initialized")
 
-                openai_tools.append({
-                    "type": "function",
-                    "name": tool.name,
-                    "description": tool.description or "",
-                    "parameters": schema.get("inputSchema", {}),
-                    "strict": False,
-                })
+                # Discover MCP tools
+                tool_result = await session.list_tools()
 
-            input_items = [
-                {
-                    "role": "user",
-                    "content": prompt,
-                }
-            ]
-
-            # Give the model opportunities to call tools and use their results.
-            for _ in range(6):
-                response = await client.responses.create(
-                    model=model,
-                    input=input_items,
-                    tools=openai_tools,
+                logger.info(
+                    "Available MCP tools: %s",
+                    [tool.name for tool in tool_result.tools],
                 )
 
-                calls = [
-                    item for item in response.output
-                    if item.type == "function_call"
+                openai_tools = []
+
+                for tool in tool_result.tools:
+                    schema = tool.model_dump(by_alias=True)
+
+                    openai_tools.append({
+                        "type": "function",
+                        "name": tool.name,
+                        "description": tool.description or "",
+                        "parameters": schema.get("inputSchema", {}),
+                        "strict": False,
+                    })
+
+                if not openai_tools:
+                    raise RuntimeError("No MCP tools were discovered.")
+
+                input_items = [
+                    {
+                        "role": "user",
+                        "content": prompt,
+                    }
                 ]
 
-                if not calls:
-                    return response.output_text
+                # Allow the model to call MCP tools
+                for round_number in range(6):
 
-                # Preserve the model's tool-call items for the next request.
-                input_items.extend(response.output)
+                    logger.info(
+                        "Starting OpenAI tool-call round %s",
+                        round_number + 1,
+                    )
 
-                for call in calls:
-                    try:
+                    response = await client.responses.create(
+                        model=model,
+                        input=input_items,
+                        tools=openai_tools,
+                    )
+
+                    calls = [
+                        item for item in response.output
+                        if item.type == "function_call"
+                    ]
+
+                    if not calls:
+                        if not response.output_text:
+                            raise RuntimeError(
+                                "OpenAI returned an empty itinerary."
+                            )
+
+                        return response.output_text
+
+                    input_items.extend(response.output)
+
+                    for call in calls:
+                        logger.info("Executing MCP tool: %s", call.name)
+
                         arguments = json.loads(call.arguments)
 
                         result = await session.call_tool(
@@ -92,18 +121,16 @@ async def generate_with_mcp(prompt: str, model: str) -> str:
                                 for item in result.content
                             ]
 
-                    except Exception as exc:
-                        output = {
-                            "error": str(exc),
-                            "tool": call.name,
-                        }
+                        input_items.append({
+                            "type": "function_call_output",
+                            "call_id": call.call_id,
+                            "output": json.dumps(output),
+                        })
 
-                    input_items.append({
-                        "type": "function_call_output",
-                        "call_id": call.call_id,
-                        "output": json.dumps(output),
-                    })
+                raise RuntimeError(
+                    "Maximum MCP tool-call rounds reached."
+                )
 
-            raise RuntimeError(
-                "Maximum MCP tool-call rounds reached."
-            )
+    except Exception:
+        logger.exception("MCP itinerary generation failed")
+        raise
