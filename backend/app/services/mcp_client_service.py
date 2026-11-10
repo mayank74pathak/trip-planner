@@ -4,7 +4,7 @@ import os
 
 from dotenv import load_dotenv
 from mcp import ClientSession
-from mcp.client.streamable_http import streamablehttp_client
+from mcp.client.streamable_http import streamable_http_client
 from openai import AsyncOpenAI
 
 load_dotenv()
@@ -20,7 +20,7 @@ async def generate_with_mcp(prompt: str, model: str) -> str:
 
     client = AsyncOpenAI()
 
-    async with streamablehttp_client(MCP_SERVER_URL) as (
+    async with streamable_http_client(MCP_SERVER_URL) as (
         read_stream,
         write_stream,
         _,
