@@ -77,11 +77,17 @@ async def generate_with_mcp(prompt: str, model: str) -> str:
                         round_number + 1,
                     )
 
-                    response = await client.responses.create(
-                        model=model,
-                        input=input_items,
-                        tools=openai_tools,
-                    )
+                    try:
+                        response = await client.responses.create(
+                            model=model,
+                            input=input_items,
+                            tools=openai_tools,
+                        )
+                    except Exception:
+                        logger.exception(
+                            "OpenAI Responses API request failed"
+                        )
+                        raise
 
                     calls = [
                         item for item in response.output
@@ -94,19 +100,30 @@ async def generate_with_mcp(prompt: str, model: str) -> str:
                                 "OpenAI returned an empty itinerary."
                             )
 
+                        logger.info("Itinerary generated successfully")
                         return response.output_text
 
                     input_items.extend(response.output)
 
                     for call in calls:
-                        logger.info("Executing MCP tool: %s", call.name)
+                        logger.info(
+                            "Executing MCP tool: %s",
+                            call.name,
+                        )
 
                         arguments = json.loads(call.arguments)
 
-                        result = await session.call_tool(
-                            call.name,
-                            arguments=arguments,
-                        )
+                        try:
+                            result = await session.call_tool(
+                                call.name,
+                                arguments=arguments,
+                            )
+                        except Exception:
+                            logger.exception(
+                                "MCP tool execution failed: %s",
+                                call.name,
+                            )
+                            raise
 
                         if result.isError:
                             output = {
@@ -135,3 +152,6 @@ async def generate_with_mcp(prompt: str, model: str) -> str:
     except Exception:
         logger.exception("MCP itinerary generation failed")
         raise
+
+    finally:
+        await client.close()
