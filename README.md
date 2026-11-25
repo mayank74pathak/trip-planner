@@ -2,7 +2,7 @@
 
 A full-stack trip planning app. Users sign up, create trips (destination, dates, number of travelers, budget), and generate a day-by-day itinerary with AI. The itinerary is produced by an OpenAI model that can call tools on a separate **MCP (Model Context Protocol) server** to look up attractions and estimate trip costs against the budget.
 
-**Live app:** https://trip-planner-ten-iota.vercel.app
+ 
 
 ## Features
 
